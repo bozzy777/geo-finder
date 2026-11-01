@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Поиск места по фото</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 20px auto; padding: 0 10px; }
+    #map { height: 400px; width: 100%; margin-top: 20px; border-radius: 8px; }
+    .upload-box { border: 2px dashed #007bff; padding: 30px; text-align: center; border-radius: 8px; background: #f8f9fa; }
+    #info { margin-top: 15px; font-weight: bold; color: #333; }
+  </style>
+</head>
+<body>
+
+  <h1>Где это снято?</h1>
+  
+  <div class="upload-box">
+    <h3>Загрузи фото с телефона</h3>
+    <input type="file" id="imageInput" accept="image/*">
+    <div id="info">Жду картинку...</div>
+  </div>
+
+  <div id="map"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/exif-js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map').setView([20, 0], 2);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    let marker = null;
+
+    document.getElementById('imageInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const infoDiv = document.getElementById('info');
+      infoDiv.innerText = "Ищем координаты в фото...";
+
+      EXIF.getData(file, function() {
+        const latArray = EXIF.getTag(this, "GPSLatitude");
+        const latRef = EXIF.getTag(this, "GPSLatitudeRef");
+        const lonArray = EXIF.getTag(this, "GPSLongitude");
+        const lonRef = EXIF.getTag(this, "GPSLongitudeRef");
+
+        if (latArray && lonArray) {
+          const lat = convertDMSToDD(latArray[0], latArray[1], latArray[2], latRef);
+          const lon = convertDMSToDD(lonArray[0], lonArray[1], lonArray[2], lonRef);
+
+          infoDiv.innerText = `Нашли! Широта: ${lat.toFixed(4)}, Долгота: ${lon.toFixed(4)}`;
+          
+          map.setView([lat, lon], 15);
+          if (marker) map.removeLayer(marker);
+          marker = L.marker([lat, lon]).addTo(map).bindPopup("Вот тут снято!").openPopup();
+        } else {
+          infoDiv.innerText = "⚠️ В этом фото нет GPS (телеграм или ватсап стирают координаты). Загрузи оригинал!";
+        }
+      });
+    });
+
+    function convertDMSToDD(deg, min, sec, dir) {
+      let dd = deg + min / 60 + sec / (60 * 60);
+      if (dir === "S" || dir === "W") dd *= -1;
+      return dd;
+    }
+  </script>
+</body>
+</html>
